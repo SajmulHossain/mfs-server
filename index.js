@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const cookieParser = require("cookie-parser");
 
 const app = express();
 app.use(
@@ -14,6 +15,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(cookieParser());
 const port = process.env.PORT || 3000;
 
 const User = require('./schema/userSchema');
@@ -59,6 +61,7 @@ app.post('/jwt', async(req, res) => {
       }
     }
 
+
     const token = jwt.sign({email: user?.email, number: user?.number}, process.env.SECRET_KEY, {expiresIn: '12h'})
     
 
@@ -66,7 +69,6 @@ app.post('/jwt', async(req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      maxAge: '2h'
     }).send({success: true, role: user?.role, user})
 })
 
@@ -79,6 +81,8 @@ app.get('/logout', async(req, res) => {
   .send({success: true});
 })
 
+
+// create user
 app.post('/users', async(req, res) => {
   const {pin, email, number, nid, role, name} = req.body;
 
@@ -91,12 +95,13 @@ app.post('/users', async(req, res) => {
 
     const encodePin = await bcrypt.hash(pin, 10);
 
-    let balance = 0;
+    let balance = 0, agentStatus = 'N/A';
 
     if(role === 'user') {
       balance = 40;
     } else if(role === 'agent') {
       balance = 100000;
+      agentStatus= 'pending';
     }
 
     const result = new User({
@@ -108,13 +113,12 @@ app.post('/users', async(req, res) => {
       name,
       balance,
       isDisabled: false,
+      agentStatus,
     });
 
     await result.save();
 
-    res.send({success: true, user: result});
-
-    
+    res.send({success: true, user: result});   
     
   } catch (err) {
     res.status(500).send({error: err.message})
@@ -125,7 +129,7 @@ app.post('/users', async(req, res) => {
    const user = req.user;
    const isExist = await User.findOne({ email: user?.email });
    if (isExist) {
-     res.send({ success: true, user: isExist });
+     res.send({ success: true, user: isExist, role:isExist?.role });
    } else {
      res.status(401).send({ success: false });
    }

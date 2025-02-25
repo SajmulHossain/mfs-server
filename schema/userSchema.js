@@ -19,7 +19,7 @@ const userSchema = mongoose.Schema({
 
   balance: Number,
   number: {
-    type: Number,
+    type: String,
     required: true,
     unique: true,
   },
@@ -39,6 +39,11 @@ const userSchema = mongoose.Schema({
     type: String,
     required: true,
     unique: true,
+  },
+
+  agentStatus: {
+    type: String,
+    default: 'pending'
   }
   
 })
