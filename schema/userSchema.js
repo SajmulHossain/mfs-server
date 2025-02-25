@@ -6,7 +6,7 @@ const userSchema = mongoose.Schema({
     required: true,
   },
   pin: {
-    type: Number,
+    type: String,
     required: true,
     unique: true
   },
@@ -33,10 +33,16 @@ const userSchema = mongoose.Schema({
   isDisabled: {
     type: Boolean,
     default: false,
+  },
+  
+  email: {
+    type: String,
+    required: true,
+    unique: true,
   }
   
 })
 
 const User = new mongoose.model("User", userSchema);
 
-module.exports(User);
+module.exports = User;
