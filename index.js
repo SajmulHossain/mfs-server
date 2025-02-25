@@ -26,6 +26,59 @@ mongoose.connect(uri)
   console.log('Mongoose connected successfully');
 })
 
+const verifyToken = async(req, res, next) => {
+  const token = req?.cookies?.token;
+
+  if(!token) {
+    return res.send(401).send({message: 'Unauthorized Access'});
+  }
+
+  jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+    if(err) {
+      return res.status(401).send({message: 'Unauthorized access'})
+    }
+
+    req.user = decoded;
+    next();
+  })
+}
+
+app.post('/jwt', async(req, res) => {
+  const {auths, pin} = req.body;
+
+    let isSuccessful = false;
+
+    const user = await User.findOne({
+      $or: [{email: auths}, {number: auths}],
+    })
+
+    if(user) {
+      isSuccessful = await bcrypt.compare(pin, user.pin);
+      if(!isSuccessful) {
+        return res.status(401).send({message: 'Wrong Credentials'});
+      }
+    }
+
+    const token = jwt.sign({email: user?.email, number: user?.number}, process.env.SECRET_KEY, {expiresIn: '12h'})
+    
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      maxAge: '2h'
+    }).send({success: true, role: user?.role, user})
+})
+
+app.get('/logout', async(req, res) => {
+  res.clearCookie("token", {
+    maxAge: 0,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+  })
+  .send({success: true});
+})
+
 app.post('/users', async(req, res) => {
   const {pin, email, number, nid, role, name} = req.body;
 
@@ -64,10 +117,21 @@ app.post('/users', async(req, res) => {
     
     
   } catch (err) {
-    res.send({error: err.message})
+    res.status(500).send({error: err.message})
   }
-
 })
+
+ app.get("/user", verifyToken, async (req, res) => {
+   const user = req.user;
+   const isExist = await User.findOne({ email: user?.email });
+   if (isExist) {
+     res.send({ success: true, user: isExist });
+   } else {
+     res.status(401).send({ success: false });
+   }
+ });
+
+
 
 
 
