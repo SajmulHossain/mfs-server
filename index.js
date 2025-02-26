@@ -235,19 +235,23 @@ app.patch("/cash-in", verifyToken, verifyAgent, async (req, res) => {
       return res.status(400).send({ message: "User does not exist!" });
     }
 
-    if(user?.role !== 'user') {
-      return res.status(400).send({message: 'Admin or Agent cannot cash in!'});
+    if (user?.role !== "user") {
+      return res
+        .status(400)
+        .send({ message: "Admin or Agent cannot cash in!" });
     }
 
     await User.updateOne({ number }, { $inc: { balance: amount } });
-  const result =  await User.updateOne({email}, {$inc: {balance: -amount}})
-  console.log(result);
-
+    const result = await User.updateOne(
+      { email },
+      { $inc: { balance: -amount } }
+    );
+    console.log(result);
 
     const transction = new Transactions({
       receiverNumber: number,
       agentNumber: agent?.number,
-      type: 'cash in',
+      type: "cash in",
       amount,
     });
 
@@ -255,15 +259,24 @@ app.patch("/cash-in", verifyToken, verifyAgent, async (req, res) => {
 
     const notification = new Notifications({
       id: number,
-      message: `${amount} cash in successfull`
-    })
+      message: `${amount} taka cash in successfull`,
+    });
 
     await notification.save();
 
-    res.send({success: true})
+    res.send({ success: true });
   } catch (err) {
-    return res.status(400).send({ message: "Something Went Wrong!" });
+    return res.status(400).send({ message: err.message });
   }
+});
+
+
+
+// * notification getting api
+app.get("/notifications", verifyToken, async (req, res) => {
+  const { number } = req.user;
+  const result = await Notifications.find({ id: number });
+  res.send(result);
 });
 
 app.get("/", (req, res) => {
