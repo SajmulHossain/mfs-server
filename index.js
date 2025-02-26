@@ -32,11 +32,21 @@ mongoose.connect(uri).then(() => {
   console.log("Mongoose connected successfully");
 });
 
+
+// isExist user common function
+const isExist = async query => {
+  const result = await User.find(query);
+  return result;
+}
+
+
+
+
 const verifyToken = async (req, res, next) => {
   const token = req?.cookies?.token;
 
   if (!token) {
-    return res.send(401).send({ message: "Unauthorized Access" });
+    return res.status(401).send({ message: "Unauthorized Access" });
   }
 
   jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
@@ -204,6 +214,29 @@ app.patch("/agent-status/:id", verifyToken, verifyAdmin, async (req, res) => {
   const result = await User.updateOne(query, updatedStatus);
   res.send(result);
 });
+
+// cash in 
+app.get('/cash-in', verifyToken, verifyAgent, async(req, res) => {
+  const {email} = req.user;
+  const agent = await isExist({email});
+  const {amount, pin, number} = req.body;
+  if(agent?.balance < amount) {
+    return res.status(400).send({message: 'Insufficient Balance!'})
+  }
+
+  const user = await isExist({number});
+  if(!user) {
+    return res.status(400).send({message: 'User does not exist!'});
+  }
+
+  const checkPIN = await bcrypt.compare(pin, agent?.pin);
+
+  if(!checkPIN) {
+    return res.send(400).message({message: 'Wrong PIN'})
+  }
+
+
+})
 
 app.get("/", (req, res) => {
   res.send("PH MFS server is running!");
