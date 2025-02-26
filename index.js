@@ -362,6 +362,18 @@ app.get('/states', verifyToken, verifyAdmin, async(req, res) => {
   res.send({income, totalMoney});
 })
 
+// *user blocking api
+app.patch('/user/:number', verifyToken, verifyAdmin, async(req, res) => {
+  const { number} = req.params;
+  const data = req.body;
+  console.log(data);
+  const updateStatus = {
+    $set: data
+  }
+  const result = await User.updateOne({number}, updateStatus)
+  res.send(result);
+})
+
 // *balance getting common api
 app.get("/balance", verifyToken, async (req, res) => {
   const { email } = req.user;
@@ -394,7 +406,10 @@ app.get('/states/:number', verifyToken, verifyAdmin, async(req, res) => {
   res.send(result);
 })
 
-// * get agent request 
+// * send withdraw request
+app.post("/withdraws", verifyToken, verifyAgent, async(req, res) => {
+  
+})
 
 app.get("/", (req, res) => {
   res.send("iCash server is running!");

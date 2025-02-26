@@ -43,6 +43,7 @@ const userSchema = new mongoose.Schema({
 
   agentStatus: {
     type: String,
+    enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
 
