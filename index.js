@@ -27,6 +27,7 @@ const port = process.env.PORT || 3000;
 const User = require("./schema/userSchema");
 const Transactions = require("./schema/transactionSchema");
 const Notifications = require("./schema/notificationSchema");
+const Withdraws = require("/schema/withdrawSchema");
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.saftd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -408,8 +409,30 @@ app.get('/states/:number', verifyToken, verifyAdmin, async(req, res) => {
 
 // * send withdraw request
 app.post("/withdraws", verifyToken, verifyAgent, async(req, res) => {
-  
+  const { pin } = req.body;
+  const { number } = req.user;
+
+  const agent = await isExist({number});
+
+  if(!agent) {
+    return res.status(400).send({message: 'User could not found!'})
+  }
+
+  const checkPIN = await bcrypt.compare(pin, agent?.pin);
+
+  if(!checkPIN) {
+    return res.status(400).send({message: 'Incorrect PIN'})
+  }
+
+  const withdraw = new Withdraws({
+    agentNumber: number,
+    name: agent?.name,
+  })
+
+  await withdraw.save();
 })
+
+// * get pending withdraw
 
 app.get("/", (req, res) => {
   res.send("iCash server is running!");
