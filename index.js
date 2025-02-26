@@ -433,6 +433,22 @@ app.post("/withdraws", verifyToken, verifyAgent, async(req, res) => {
 })
 
 // * get pending withdraw
+app.get('/withdraws',verifyToken, verifyAdmin, async(req, res) => {
+  const result = await Withdraws.find({status:'pending'});
+  res.send(result);
+})
+
+// * accept or reject request
+app.patch('/withdraws/:id', verifyToken, verifyAdmin, async(req, res) => {
+  const {id} = req.params;
+  const query = { _id: new ObjectId(id) };
+  const data = req.body;
+  const updatedStatus = {
+    $set: data
+  }
+  const result = await Withdraws.updateOne(query,updatedStatus);
+  res.send(result);
+})
 
 app.get("/", (req, res) => {
   res.send("iCash server is running!");
