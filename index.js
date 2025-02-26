@@ -25,6 +25,8 @@ app.use(cookieParser());
 const port = process.env.PORT || 3000;
 
 const User = require("./schema/userSchema");
+const Transactions = require("./schema/transactionSchema");
+const Notifications = require("./schema/notificationSchema");
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.saftd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -32,15 +34,11 @@ mongoose.connect(uri).then(() => {
   console.log("Mongoose connected successfully");
 });
 
-
-// isExist user common function
-const isExist = async query => {
-  const result = await User.find(query);
+// * isExist user common function
+const isExist = async (query) => {
+  const result = await User.findOne(query);
   return result;
-}
-
-
-
+};
 
 const verifyToken = async (req, res, next) => {
   const token = req?.cookies?.token;
@@ -215,28 +213,58 @@ app.patch("/agent-status/:id", verifyToken, verifyAdmin, async (req, res) => {
   res.send(result);
 });
 
-// cash in 
-app.get('/cash-in', verifyToken, verifyAgent, async(req, res) => {
-  const {email} = req.user;
-  const agent = await isExist({email});
-  const {amount, pin, number} = req.body;
-  if(agent?.balance < amount) {
-    return res.status(400).send({message: 'Insufficient Balance!'})
+// cash in
+app.patch("/cash-in", verifyToken, verifyAgent, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const agent = await isExist({ email });
+
+    const { amount, pin, number } = req.body;
+    if (agent?.balance < amount) {
+      return res.status(400).send({ message: "Insufficient Balance!" });
+    }
+
+    const checkPIN = await bcrypt.compare(pin, agent?.pin);
+
+    if (!checkPIN) {
+      return res.send(400).message({ message: "Wrong PIN" });
+    }
+
+    const user = await isExist({ number });
+    if (!user) {
+      return res.status(400).send({ message: "User does not exist!" });
+    }
+
+    if(user?.role !== 'user') {
+      return res.status(400).send({message: 'Admin or Agent cannot cash in!'});
+    }
+
+    await User.updateOne({ number }, { $inc: { balance: amount } });
+  const result =  await User.updateOne({email}, {$inc: {balance: -amount}})
+  console.log(result);
+
+
+    const transction = new Transactions({
+      receiverNumber: number,
+      agentNumber: agent?.number,
+      type: 'cash in',
+      amount,
+    });
+
+    await transction.save();
+
+    const notification = new Notifications({
+      id: number,
+      message: `${amount} cash in successfull`
+    })
+
+    await notification.save();
+
+    res.send({success: true})
+  } catch (err) {
+    return res.status(400).send({ message: "Something Went Wrong!" });
   }
-
-  const user = await isExist({number});
-  if(!user) {
-    return res.status(400).send({message: 'User does not exist!'});
-  }
-
-  const checkPIN = await bcrypt.compare(pin, agent?.pin);
-
-  if(!checkPIN) {
-    return res.send(400).message({message: 'Wrong PIN'})
-  }
-
-
-})
+});
 
 app.get("/", (req, res) => {
   res.send("PH MFS server is running!");
