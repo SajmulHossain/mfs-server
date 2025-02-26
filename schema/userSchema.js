@@ -44,6 +44,11 @@ const userSchema = mongoose.Schema({
   agentStatus: {
     type: String,
     default: 'pending'
+  },
+
+  income: {
+    type: Number,
+    default: 0
   }
   
 })

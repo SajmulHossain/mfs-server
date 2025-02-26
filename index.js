@@ -9,7 +9,11 @@ const cookieParser = require("cookie-parser");
 const app = express();
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://ph-mfs.vercel.app",
+      "http://192.168.0.105:5173",
+    ],
     credentials: true,
     optionsSuccessStatus: 200,
   })
@@ -45,6 +49,26 @@ const verifyToken = async(req, res, next) => {
   })
 }
 
+const verifyAdmin = async (req, res, next) => {
+  const email = req?.user?.email;
+  const user = await User.findOne({email});
+  if(!user || user?.role !== 'admin') {
+    return res.status(403).send({message: "Access Forbidden! Only Admin Can Access."})
+  }
+
+  next();
+}
+const verifyAgent = async (req, res, next) => {
+  const email = req?.user?.email;
+  const user = await User.findOne({email});
+  if(!user || user?.role !== 'agent') {
+    return res.status(403).send({message: "Access Forbidden! Only Agent Can Access."})
+  }
+
+  next();
+}
+
+// login or jwt
 app.post('/jwt', async(req, res) => {
   const {auths, pin} = req.body;
 
@@ -72,6 +96,7 @@ app.post('/jwt', async(req, res) => {
     }).send({success: true, role: user?.role, user})
 })
 
+// logout
 app.get('/logout', async(req, res) => {
   res.clearCookie("token", {
     maxAge: 0,
@@ -114,6 +139,7 @@ app.post('/users', async(req, res) => {
       balance,
       isDisabled: false,
       agentStatus,
+      income: 0,
     });
 
     await result.save();
@@ -125,15 +151,34 @@ app.post('/users', async(req, res) => {
   }
 })
 
+// check if token user is valid
  app.get("/user", verifyToken, async (req, res) => {
    const user = req.user;
    const isExist = await User.findOne({ email: user?.email });
    if (isExist) {
-     res.send({ success: true, user: isExist, role:isExist?.role });
+     res.send({ success: true, user: isExist, role:isExist?.role, isDisabled: isExist?.isDisabled });
    } else {
      res.status(401).send({ success: false });
    }
  });
+
+
+//  get all user for admin 
+app.get('/users', verifyToken, verifyAdmin, async(req, res) => {
+  const { search } = req.query;
+  const result = await User.find({
+    $or: [{ role: "user" }, { role: "agent" }],
+    number: { $regex: search, $options: "i" },
+  });
+  res.send(result);
+})
+
+// get all agent request for admin
+app.get('/agent-requests', verifyToken, verifyAdmin, async(req, res) => {
+  const query = { agentStatus: 'pending' };
+  const result = await User.find(query);
+  res.send(result);
+})
 
 
 
