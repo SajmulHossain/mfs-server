@@ -134,6 +134,18 @@ app.post("/users", async (req, res) => {
       return res.status(400).send({ message: "Email already exist" });
     }
 
+    const isNumberExist =  await isExist({number});
+
+    if (isNumberExist) {
+      return res.status(400).send({ message: "Number already exist" });
+    }
+
+    const isExistNid = await isExist({nid});
+    if(isExistNid) {
+      return res.status(400).send({ message: "NID already exist" });
+    }
+
+
     const encodePin = await bcrypt.hash(pin, 10);
 
     let balance = 0,
@@ -331,6 +343,25 @@ app.patch("/cash-out", verifyToken, async (req, res) => {
   }
 });
 
+// *admin states 
+app.get('/states', verifyToken, verifyAdmin, async(req, res) => {
+  const admin = await User.findOne({role: 'admin'});
+  const {income} = admin || {};
+  const totalUser = await User.find({role: 'user'});
+  const totalAgent = await User.find({role:'agent'});
+  const usersMoney = totalUser.reduce((a,b) => {
+    return a + b.balance;
+  }, 0)
+
+  const agentsMoney = totalAgent.reduce((a, b) => {
+    return a + b.income;
+  }, 0)
+
+  const totalMoney = income+usersMoney+agentsMoney;
+
+  res.send({income, totalMoney});
+})
+
 // *balance getting common api
 app.get("/balance", verifyToken, async (req, res) => {
   const { email } = req.user;
@@ -352,9 +383,18 @@ app.get("/transactions", verifyToken, async (req, res) => {
   const { number } = req.user;
   const result = await Transactions.find({
     $or: [{ agentNumber: number }, { userNumber: number }],
-  });
+  }).limit(100);
   res.send(result);
 });
+
+// transaction for admin for each user
+app.get('/states/:number', verifyToken, verifyAdmin, async(req, res) => {
+  const { number } = req.params;
+  const result = await Transactions.find({$or: [{agentNumber: number}, {userNumber: number}]})
+  res.send(result);
+})
+
+// * get agent request 
 
 app.get("/", (req, res) => {
   res.send("iCash server is running!");
