@@ -341,15 +341,24 @@ app.patch('/cash-out', verifyToken, async(req, res) => {
   }
 })
 
+// *balance getting common api
+app.get('/balance',verifyToken, async(req, res) => {
+  const { email } = req.user;
+  const result = await User.findOne({email});
+  res.send({balance: result?.balance})
+})
+
 // * notification getting api
 app.get("/notifications", verifyToken, async (req, res) => {
   const { number } = req.user;
-  const result = await Notifications.find({ id: number });
+  const result = await Notifications.find({ id: number }).sort({timeStamp: -1});
   res.send(result);
 });
 
+
+
 app.get("/", (req, res) => {
-  res.send("PH MFS server is running!");
+  res.send("iCash server is running!");
 });
 
 app.listen(port, () => {
