@@ -14,7 +14,7 @@ const transactionSchema = new mongoose.Schema({
     default: generateTransactionId()
   },
 
-  receiverNumber: {
+  userNumber: {
     type: String,
     required: true,
   },

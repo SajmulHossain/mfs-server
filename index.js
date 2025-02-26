@@ -242,14 +242,13 @@ app.patch("/cash-in", verifyToken, verifyAgent, async (req, res) => {
     }
 
     await User.updateOne({ number }, { $inc: { balance: amount } });
-    const result = await User.updateOne(
+    await User.updateOne(
       { email },
       { $inc: { balance: -amount } }
     );
-    console.log(result);
 
     const transction = new Transactions({
-      receiverNumber: number,
+      userNumber: number,
       agentNumber: agent?.number,
       type: "cash in",
       amount,
@@ -270,7 +269,77 @@ app.patch("/cash-in", verifyToken, verifyAgent, async (req, res) => {
   }
 });
 
+// * cash out api
+app.patch('/cash-out', verifyToken, async(req, res) => {
+  try {
+    const { email } = req.user;
+    const user = await isExist({ email });
 
+    const { amount, pin, number } = req.body;
+
+    const totalCost = +amount + amount * 0.015;
+
+    if (user?.balance < totalCost) {
+      return res.status(400).send({ message: "Insufficient Balance!" });
+    }
+
+    const checkPIN = await bcrypt.compare(pin, user?.pin);
+
+    if (!checkPIN) {
+      return res.send(400).message({ message: "Wrong PIN" });
+    }
+
+    const agent = await isExist({ number });
+    if (!agent) {
+      return res.status(400).send({ message: "Agent does not exist!" });
+    }
+
+    if (agent?.role !== "agent") {
+      return res
+        .status(400)
+        .send({ message: "This is not an agent number!" });
+    }
+
+    
+    const agentIncome = +amount*0.01;
+    const adminIncome = +amount*0.005;
+
+    await User.updateOne({ email }, { $inc: { balance: -totalCost } });
+    await User.updateOne(
+      { number },
+      { $inc: { income: agentIncome } }
+    );
+   await User.updateOne({role: 'admin'}, {$inc: {income: adminIncome}})
+  
+
+    const transction = new Transactions({
+      userNumber: req?.user?.number,
+      agentNumber: agent?.number,
+      type: "cash out",
+      amount,
+      charge: totalCost-amount,
+    });
+
+    await transction.save();
+
+    const userNotification = new Notifications({
+      id: req?.user?.number,
+      message: `${amount} taka cash out from ${agent?.name}`,
+    });
+
+    const agentNotification = new Notifications({
+      id: agent?.number,
+      message: `You earned ${agentIncome} taka from ${req?.user?.number}. Cashout money: ${amount}`
+    })
+
+    await userNotification.save();
+    await agentNotification.save();
+
+    res.send({ success: true });
+  } catch (err) {
+    return res.status(400).send({ message: err.message });
+  }
+})
 
 // * notification getting api
 app.get("/notifications", verifyToken, async (req, res) => {
