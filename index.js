@@ -332,9 +332,15 @@ app.patch("/cash-out", verifyToken, async (req, res) => {
       return res.status(400).send({ message: "Agent does not exist!" });
     }
 
-    if (agent?.role !== "agent") {
-      return res.status(400).send({ message: "This is not an agent number!" });
+    if (agent?.agentStatus !== "approved" || agent?.isDisabled) {
+      return res.status(400).send({ message: "This agent is not a legal agent. Try again with another agent." });
     }
+
+      if (agent?.role !== "agent") {
+        return res
+          .status(400)
+          .send({ message: "This is not an agent number!" });
+      }
 
     const agentIncome = +amount * 0.01;
     const adminIncome = +amount * 0.005;
@@ -589,11 +595,18 @@ app.patch("/send-money", verifyToken, async (req, res) => {
 
   const user = await isExist({ email });
 
+  if (amount < 50) {
+    return res
+      .status(400)
+      .send({ message: "Minumum amount should be 50 taka" });
+  }
+
   const checkPIN = await bcrypt.compare(pin, user?.pin);
 
   if (!checkPIN) {
     return res.status(400).send({ message: "Incorrect PIN" });
   }
+
 
   if (number === user?.number) {
     return res
@@ -608,6 +621,10 @@ app.patch("/send-money", verifyToken, async (req, res) => {
       .status(400)
       .send({ message: "User could not found. Try again." });
   }
+
+    if (isUser?.isDisabled) {
+      return res.status(400).send({ message: "This is an illegal user!" });
+    }
 
   if (isUser?.role !== "user") {
     return res.status(400).send({ message: "This is not an iCash user!" });
