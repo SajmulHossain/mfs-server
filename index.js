@@ -246,7 +246,6 @@ app.patch("/agent-status/:id", verifyToken, verifyAdmin, async (req, res) => {
   const { agentStatus } = req.body;
   const { id } = req.params;
   const query = { _id: new ObjectId(id) };
-  console.log(agentStatus);
   const updatedStatus = {
     $set: { agentStatus },
   };
@@ -401,7 +400,6 @@ app.get("/states", verifyToken, verifyAdmin, async (req, res) => {
 app.patch("/user/:number", verifyToken, verifyAdmin, async (req, res) => {
   const { number } = req.params;
   const data = req.body;
-  console.log(data);
   const updateStatus = {
     $set: data,
   };
