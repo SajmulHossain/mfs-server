@@ -8,6 +8,7 @@ const moneyRequestSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
+    default: 100000,
   },
 
   name: {

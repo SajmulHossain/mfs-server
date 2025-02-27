@@ -28,7 +28,7 @@ const User = require("./schema/userSchema");
 const Transactions = require("./schema/transactionSchema");
 const Notifications = require("./schema/notificationSchema");
 const Withdraws = require("./schema/withdrawSchema");
-const MoneyRequests = require('./schema/moneyRequestSchema');
+const MoneyRequests = require("./schema/moneyRequestSchema");
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.saftd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -136,17 +136,16 @@ app.post("/users", async (req, res) => {
       return res.status(400).send({ message: "Email already exist" });
     }
 
-    const isNumberExist =  await isExist({number});
+    const isNumberExist = await isExist({ number });
 
     if (isNumberExist) {
       return res.status(400).send({ message: "Number already exist" });
     }
 
-    const isExistNid = await isExist({nid});
-    if(isExistNid) {
+    const isExistNid = await isExist({ nid });
+    if (isExistNid) {
       return res.status(400).send({ message: "NID already exist" });
     }
-
 
     const encodePin = await bcrypt.hash(pin, 10);
 
@@ -345,36 +344,36 @@ app.patch("/cash-out", verifyToken, async (req, res) => {
   }
 });
 
-// *admin states 
-app.get('/states', verifyToken, verifyAdmin, async(req, res) => {
-  const admin = await User.findOne({role: 'admin'});
-  const {income} = admin || {};
-  const totalUser = await User.find({role: 'user'});
-  const totalAgent = await User.find({role:'agent'});
-  const usersMoney = totalUser.reduce((a,b) => {
+// *admin states
+app.get("/states", verifyToken, verifyAdmin, async (req, res) => {
+  const admin = await User.findOne({ role: "admin" });
+  const { income } = admin || {};
+  const totalUser = await User.find({ role: "user" });
+  const totalAgent = await User.find({ role: "agent" });
+  const usersMoney = totalUser.reduce((a, b) => {
     return a + b.balance;
-  }, 0)
+  }, 0);
 
   const agentsMoney = totalAgent.reduce((a, b) => {
     return a + b.income;
-  }, 0)
+  }, 0);
 
-  const totalMoney = income+usersMoney+agentsMoney;
+  const totalMoney = income + usersMoney + agentsMoney;
 
-  res.send({income, totalMoney});
-})
+  res.send({ income, totalMoney });
+});
 
 // *user blocking api
-app.patch('/user/:number', verifyToken, verifyAdmin, async(req, res) => {
-  const { number} = req.params;
+app.patch("/user/:number", verifyToken, verifyAdmin, async (req, res) => {
+  const { number } = req.params;
   const data = req.body;
   console.log(data);
   const updateStatus = {
-    $set: data
-  }
-  const result = await User.updateOne({number}, updateStatus)
+    $set: data,
+  };
+  const result = await User.updateOne({ number }, updateStatus);
   res.send(result);
-})
+});
 
 // *balance getting common api
 app.get("/balance", verifyToken, async (req, res) => {
@@ -402,81 +401,85 @@ app.get("/transactions", verifyToken, async (req, res) => {
 });
 
 // transaction for admin for each user
-app.get('/states/:number', verifyToken, verifyAdmin, async(req, res) => {
+app.get("/states/:number", verifyToken, verifyAdmin, async (req, res) => {
   const { number } = req.params;
-  const result = await Transactions.find({$or: [{agentNumber: number}, {userNumber: number}]})
+  const result = await Transactions.find({
+    $or: [{ agentNumber: number }, { userNumber: number }],
+  });
   res.send(result);
-})
+});
 
 // * send withdraw request
-app.post("/withdraws", verifyToken, verifyAgent, async(req, res) => {
+app.post("/withdraws", verifyToken, verifyAgent, async (req, res) => {
   const { pin, amount } = req.body;
   const { number } = req.user;
 
-  const agent = await isExist({number});
+  const agent = await isExist({ number });
 
-  if(!agent) {
-    return res.status(400).send({message: 'User could not found!'})
+  if (!agent) {
+    return res.status(400).send({ message: "User could not found!" });
   }
 
   const checkPIN = await bcrypt.compare(pin, agent?.pin);
 
-  if(!checkPIN) {
-    return res.status(400).send({message: 'Incorrect PIN'})
+  if (!checkPIN) {
+    return res.status(400).send({ message: "Incorrect PIN" });
   }
 
-  if(agent?.income < amount) {
-    return res.status(400).send({message: 'Insufficient Balance'})
+  if (agent?.income < amount) {
+    return res.status(400).send({ message: "Insufficient Balance" });
   }
 
   const withdraw = new Withdraws({
     agentNumber: number,
     name: agent?.name,
-    amount
-  })
+    amount,
+  });
 
   const result = await withdraw.save();
   res.send(result);
-})
+});
 
 // * get pending withdraw
-app.get('/withdraws',verifyToken, verifyAdmin, async(req, res) => {
-  const result = await Withdraws.find({status:'pending'});
+app.get("/withdraws", verifyToken, verifyAdmin, async (req, res) => {
+  const result = await Withdraws.find({ status: "pending" });
   res.send(result);
-})
+});
 
 // * accept or reject request
-app.patch('/withdraw/:id', verifyToken, verifyAdmin, async(req, res) => {
-  const {id} = req.params;
+app.patch("/withdraw/:id", verifyToken, verifyAdmin, async (req, res) => {
+  const { id } = req.params;
   const query = { _id: new ObjectId(id) };
   const { agentNumber, amount } = await Withdraws.findOne(query);
   const data = req.body;
   const { status } = data;
   const updatedStatus = {
-    $set: data
-  }
-  const result = await Withdraws.updateOne(query,updatedStatus);
-  if(!result?.modifiedCount) {
-    return res.status(400).send({message: 'Cannot update! Try again.'})
+    $set: data,
+  };
+  const result = await Withdraws.updateOne(query, updatedStatus);
+  if (!result?.modifiedCount) {
+    return res.status(400).send({ message: "Cannot update! Try again." });
   }
 
-  if(status==="approved") {
-    await User.updateOne({number: agentNumber}, {$inc: {income: -amount}})
+  if (status === "approved") {
+    await User.updateOne(
+      { number: agentNumber },
+      { $inc: { income: -amount } }
+    );
   }
 
   const notification = new Notifications({
     id: agentNumber,
-    route: '/transactions',
-    message: `Your ${amount} tk withdraw request has been ${status}!`
-  })
+    route: "/transactions",
+    message: `Your ${amount} tk withdraw request has been ${status}!`,
+  });
 
   await notification.save();
-  res.send({success: true})
-})
-
+  res.send({ success: true });
+});
 
 // *money request post
-app.post("/money-request", verifyToken, verifyAgent, async(req, res) => {
+app.post("/money-request", verifyToken, verifyAgent, async (req, res) => {
   const { pin } = req.body;
   const { number } = req.user;
 
@@ -499,10 +502,41 @@ app.post("/money-request", verifyToken, verifyAgent, async(req, res) => {
 
   const result = await request.save();
   res.send(result);
-})
+});
 
-//  * money request get for admin 
+//  * money request get for admin
+app.get("/money-requests", verifyToken, verifyAdmin, async (req, res) => {
+  const result = await MoneyRequests.find({ status: "pending" });
+  res.send(result);
+});
 
+app.patch("/money-request/:id", verifyToken, verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const query = { _id: new ObjectId(id) };
+  const { agentNumber, amount } = await MoneyRequests.findOne(query);
+  const data = req.body;
+  const { status } = data;
+  const updatedStatus = {
+    $set: data,
+  };
+  const result = await MoneyRequests.updateOne(query, updatedStatus);
+  if (!result?.modifiedCount) {
+    return res.status(400).send({ message: "Cannot update! Try again." });
+  }
+
+  if (status === "approved") {
+    await User.updateOne({ number: agentNumber }, { $inc: { balance: amount } });
+  }
+
+  const notification = new Notifications({
+    id: agentNumber,
+    route: "/transactions",
+    message: `Your ${amount} tk request has been ${status}!`,
+  });
+
+  await notification.save();
+  res.send({ success: true });
+});
 
 app.get("/", (req, res) => {
   res.send("iCash server is running!");

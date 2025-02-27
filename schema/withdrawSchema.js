@@ -27,9 +27,8 @@ const withdrawSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
-    default: 100000
   },
 });
 
-const Withdraws = mongoose.model("Withdraws", withdrawSchema);
+const Withdraws = new mongoose.model("Withdraws", withdrawSchema);
 module.exports = Withdraws;
