@@ -27,7 +27,7 @@ const port = process.env.PORT || 3000;
 const User = require("./schema/userSchema");
 const Transactions = require("./schema/transactionSchema");
 const Notifications = require("./schema/notificationSchema");
-const Withdraws = require("/schema/withdrawSchema");
+const Withdraws = require("./schema/withdrawSchema");
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.saftd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -409,7 +409,7 @@ app.get('/states/:number', verifyToken, verifyAdmin, async(req, res) => {
 
 // * send withdraw request
 app.post("/withdraws", verifyToken, verifyAgent, async(req, res) => {
-  const { pin } = req.body;
+  const { pin, amount } = req.body;
   const { number } = req.user;
 
   const agent = await isExist({number});
@@ -424,12 +424,18 @@ app.post("/withdraws", verifyToken, verifyAgent, async(req, res) => {
     return res.status(400).send({message: 'Incorrect PIN'})
   }
 
+  if(agent?.income < amount) {
+    return res.status(400).send({message: 'Insufficient Balance'})
+  }
+
   const withdraw = new Withdraws({
     agentNumber: number,
     name: agent?.name,
+    amount
   })
 
-  await withdraw.save();
+  const result = await withdraw.save();
+  res.send(result);
 })
 
 // * get pending withdraw
@@ -439,15 +445,32 @@ app.get('/withdraws',verifyToken, verifyAdmin, async(req, res) => {
 })
 
 // * accept or reject request
-app.patch('/withdraws/:id', verifyToken, verifyAdmin, async(req, res) => {
+app.patch('/withdraw/:id', verifyToken, verifyAdmin, async(req, res) => {
   const {id} = req.params;
   const query = { _id: new ObjectId(id) };
+  const { agentNumber, amount } = await Withdraws.findOne(query);
   const data = req.body;
+  const { status } = data;
   const updatedStatus = {
     $set: data
   }
   const result = await Withdraws.updateOne(query,updatedStatus);
-  res.send(result);
+  if(!result?.modifiedCount) {
+    return res.status(400).send({message: 'Cannot update! Try again.'})
+  }
+
+  if(status==="approved") {
+    await User.updateOne({number: agentNumber}, {$inc: {income: -amount}})
+  }
+
+  const notification = new Notifications({
+    id: agentNumber,
+    route: '/transactions',
+    message: `Your ${amount} tk withdraw request has been ${status}!`
+  })
+
+  await notification.save();
+  res.send({success: true})
 })
 
 app.get("/", (req, res) => {

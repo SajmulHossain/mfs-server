@@ -23,6 +23,11 @@ const withdrawSchema = new mongoose.Schema({
     enum: ["pending", "apporved", "rejected"],
     default: "pending",
   },
+
+  amount: {
+    type: Number,
+    required: true,
+  },
 });
 
 const Withdraws = mongoose.model("Withdraws", withdrawSchema);
