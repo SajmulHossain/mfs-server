@@ -11,15 +11,15 @@ const transactionSchema = new mongoose.Schema({
   transactionId: {
     type: String,
     required: true,
-    default: generateTransactionId()
+    default: generateTransactionId(),
   },
 
-  userNumber: {
+  recieverNumber: {
     type: String,
     required: true,
   },
 
-  agentNumber: {
+  senderNumber: {
     type: String,
     required: true,
   },
@@ -27,25 +27,25 @@ const transactionSchema = new mongoose.Schema({
   timeStamp: {
     type: Date,
     required: true,
-    default: Date.now
+    default: Date.now,
   },
 
   type: {
     type: String,
-    enum: ['send money', 'cash out', 'cash in'],
+    enum: ["send money", "cash out", "cash in"],
     required: true,
   },
 
   charge: {
     type: Number,
-    default: 0
+    default: 0,
   },
 
   amount: {
     type: Number,
     required: true,
-  }
-})
+  },
+});
 
 const Transactions = new mongoose.model("Transactions", transactionSchema);
 

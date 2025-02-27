@@ -172,6 +172,16 @@ app.post("/users", async (req, res) => {
       income: 0,
     });
 
+    if(role === 'agent') {
+      const notification = new Notifications({
+        id: "01601427140",
+        message: `${name} registered as agent. Approve or Reject.`,
+        route: "/agent-requests",
+      });
+
+      await notification.save();
+    }
+
     await result.save();
 
     res.send({ success: true, user: result });
@@ -258,8 +268,8 @@ app.patch("/cash-in", verifyToken, verifyAgent, async (req, res) => {
     await User.updateOne({ email }, { $inc: { balance: -amount } });
 
     const transction = new Transactions({
-      userNumber: number,
-      agentNumber: agent?.number,
+      recieverNumber: number,
+      senderNumber: agent?.number,
       type: "cash in",
       amount,
     });
@@ -316,8 +326,8 @@ app.patch("/cash-out", verifyToken, async (req, res) => {
     await User.updateOne({ role: "admin" }, { $inc: { income: adminIncome } });
 
     const transction = new Transactions({
-      userNumber: req?.user?.number,
-      agentNumber: agent?.number,
+      senderNumber: req?.user?.number,
+      recieverNumber: agent?.number,
       type: "cash out",
       amount,
       charge: totalCost - amount,
@@ -395,7 +405,7 @@ app.get("/notifications", verifyToken, async (req, res) => {
 app.get("/transactions", verifyToken, async (req, res) => {
   const { number } = req.user;
   const result = await Transactions.find({
-    $or: [{ agentNumber: number }, { userNumber: number }],
+    $or: [{ recieverNumber: number }, { senderNumber: number }],
   }).limit(100);
   res.send(result);
 });
@@ -404,7 +414,7 @@ app.get("/transactions", verifyToken, async (req, res) => {
 app.get("/states/:number", verifyToken, verifyAdmin, async (req, res) => {
   const { number } = req.params;
   const result = await Transactions.find({
-    $or: [{ agentNumber: number }, { userNumber: number }],
+    $or: [{ senderNumber: number }, { recieverNumber: number }],
   });
   res.send(result);
 });
@@ -436,6 +446,13 @@ app.post("/withdraws", verifyToken, verifyAgent, async (req, res) => {
     amount,
   });
 
+  const notification = new Notifications({
+    id: "01601427140",
+    message: `${agent?.name} sent you ${amount} taka withdraw request.`,
+    route: "/withdraw-requests",
+  });
+
+  await notification.save();
   const result = await withdraw.save();
   res.send(result);
 });
@@ -500,6 +517,13 @@ app.post("/money-request", verifyToken, verifyAgent, async (req, res) => {
     name: agent?.name,
   });
 
+  const notification = new Notifications({
+    id: "01601427140",
+    message: `${agent?.name} sent you money request.`,
+    route: "/money-requests",
+  });
+
+  await notification.save();
   const result = await request.save();
   res.send(result);
 });
@@ -525,7 +549,10 @@ app.patch("/money-request/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 
   if (status === "approved") {
-    await User.updateOne({ number: agentNumber }, { $inc: { balance: amount } });
+    await User.updateOne(
+      { number: agentNumber },
+      { $inc: { balance: amount } }
+    );
   }
 
   const notification = new Notifications({
@@ -535,6 +562,87 @@ app.patch("/money-request/:id", verifyToken, verifyAdmin, async (req, res) => {
   });
 
   await notification.save();
+  res.send({ success: true });
+});
+
+app.patch("/send-money", verifyToken, async (req, res) => {
+  const { number, amount, pin } = req.body;
+  const { email } = req.user;
+
+
+  const user = await isExist({ email });
+
+  const checkPIN = await bcrypt.compare(pin, user?.pin);
+
+  if (!checkPIN) {
+    return res.status(400).send({ message: "Incorrect PIN" });
+  }
+
+  if(number === user?.number) {
+    return res.status(400).send({message: 'You cannot send money to your own number!'})
+  }
+
+  const isUser = await isExist({ number });
+
+  if (!isUser) {
+    return res
+      .status(400)
+      .send({ message: "User could not found. Try again." });
+  }
+
+  if (isUser?.role !== "user") {
+    return res.status(400).send({ message: "This is not an iCash user!" });
+  }
+
+  let totalAmout = 0;
+  if (amount > 100) {
+    totalAmout = +amount + 5;
+  } else {
+    totalAmout = amount;
+  }
+
+  if (totalAmout > user?.balance) {
+    return res.status(400).send({ message: "Insufficent Balance!" });
+  }
+
+  const result = await User.updateOne(
+    { number },
+    { $inc: { balance: amount } }
+  );
+  if (!result?.modifiedCount) {
+    return res.status(400).send({ message: "Failed to Send Money!" });
+  }
+
+  await User.updateOne({ email }, { $inc: { balance: -totalAmout } });
+  
+  if(amount > 100) {
+    await User.updateOne({ role: "admin" }, { $inc: { income: 5 } });
+  }
+
+  const senderNotification = new Notifications({
+    id: user?.number,
+    message: `${amount} taka sent to ${isUser?.name}.`,
+    route: "/transactions",
+  });
+  const recieverNotification = new Notifications({
+    id: number,
+    message: `You got ${amount} taka from ${user?.name}.`,
+    route: "/transactions",
+  });
+
+  await senderNotification.save();
+  await recieverNotification.save();
+
+  const transaction = new Transactions({
+    senderNumber: user?.number,
+    recieverNumber: number,
+    type: "send money",
+    amount,
+    charge: amount > 100 ? 5 : 0,
+  });
+
+  await transaction.save();
+
   res.send({ success: true });
 });
 

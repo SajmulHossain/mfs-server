@@ -50,6 +50,12 @@ const userSchema = new mongoose.Schema({
   income: {
     type: Number,
     default: 0
+  },
+
+  isLoggedIn {
+    type: Boolean,
+    required: true,
+    default: false,
   }
   
 })
