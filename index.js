@@ -99,6 +99,22 @@ app.post("/jwt", async (req, res) => {
     }
   }
 
+  if (user !== "admin") {
+    if (user?.isLoggedIn) {
+      return res
+        .status(500)
+        .send({
+          message:
+            "This account already logged in another device. Log out there first.",
+        });
+    }
+
+    await User.updateOne(
+      { email: user?.email },
+      { $set: { isLoggedIn: true } }
+    );
+  }
+
   const token = jwt.sign(
     { email: user?.email, number: user?.number },
     process.env.SECRET_KEY,
@@ -115,7 +131,9 @@ app.post("/jwt", async (req, res) => {
 });
 
 // logout
-app.get("/logout", async (req, res) => {
+app.get("/logout", verifyToken, async (req, res) => {
+  const { email } = req?.user;
+  await User.updateOne({ email }, { $set: { isLoggedIn: false } });
   res
     .clearCookie("token", {
       maxAge: 0,
@@ -172,7 +190,7 @@ app.post("/users", async (req, res) => {
       income: 0,
     });
 
-    if(role === 'agent') {
+    if (role === "agent") {
       const notification = new Notifications({
         id: "01601427140",
         message: `${name} registered as agent. Approve or Reject.`,
@@ -211,7 +229,7 @@ app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   const { search } = req.query;
   const result = await User.find({
     $or: [{ role: "user" }, { role: "agent" }],
-    number: { $regex: search, $options: "i" },
+    number: { $regex: search || "", $options: "i" },
   });
   res.send(result);
 });
@@ -569,7 +587,6 @@ app.patch("/send-money", verifyToken, async (req, res) => {
   const { number, amount, pin } = req.body;
   const { email } = req.user;
 
-
   const user = await isExist({ email });
 
   const checkPIN = await bcrypt.compare(pin, user?.pin);
@@ -578,8 +595,10 @@ app.patch("/send-money", verifyToken, async (req, res) => {
     return res.status(400).send({ message: "Incorrect PIN" });
   }
 
-  if(number === user?.number) {
-    return res.status(400).send({message: 'You cannot send money to your own number!'})
+  if (number === user?.number) {
+    return res
+      .status(400)
+      .send({ message: "You cannot send money to your own number!" });
   }
 
   const isUser = await isExist({ number });
@@ -614,8 +633,8 @@ app.patch("/send-money", verifyToken, async (req, res) => {
   }
 
   await User.updateOne({ email }, { $inc: { balance: -totalAmout } });
-  
-  if(amount > 100) {
+
+  if (amount > 100) {
     await User.updateOne({ role: "admin" }, { $inc: { income: 5 } });
   }
 
