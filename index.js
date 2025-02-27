@@ -28,6 +28,7 @@ const User = require("./schema/userSchema");
 const Transactions = require("./schema/transactionSchema");
 const Notifications = require("./schema/notificationSchema");
 const Withdraws = require("./schema/withdrawSchema");
+const MoneyRequests = require('./schema/moneyRequestSchema');
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.saftd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -472,6 +473,36 @@ app.patch('/withdraw/:id', verifyToken, verifyAdmin, async(req, res) => {
   await notification.save();
   res.send({success: true})
 })
+
+
+// *money request post
+app.post("/money-request", verifyToken, verifyAgent, async(req, res) => {
+  const { pin } = req.body;
+  const { number } = req.user;
+
+  const agent = await isExist({ number });
+
+  if (!agent) {
+    return res.status(400).send({ message: "User could not found!" });
+  }
+
+  const checkPIN = await bcrypt.compare(pin, agent?.pin);
+
+  if (!checkPIN) {
+    return res.status(400).send({ message: "Incorrect PIN" });
+  }
+
+  const request = new MoneyRequests({
+    agentNumber: number,
+    name: agent?.name,
+  });
+
+  const result = await request.save();
+  res.send(result);
+})
+
+//  * money request get for admin 
+
 
 app.get("/", (req, res) => {
   res.send("iCash server is running!");

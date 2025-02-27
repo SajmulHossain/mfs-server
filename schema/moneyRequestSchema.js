@@ -1,8 +1,12 @@
 const mongoose = require("mongoose");
 
-const withdrawSchema = new mongoose.Schema({
+const moneyRequestSchema = new mongoose.Schema({
   agentNumber: {
     type: String,
+    required: true,
+  },
+  amount: {
+    type: Number,
     required: true,
   },
 
@@ -23,13 +27,8 @@ const withdrawSchema = new mongoose.Schema({
     enum: ["pending", "apporved", "rejected"],
     default: "pending",
   },
-
-  amount: {
-    type: Number,
-    required: true,
-    default: 100000
-  },
 });
 
-const Withdraws = mongoose.model("Withdraws", withdrawSchema);
-module.exports = Withdraws;
+const MoneyRequests = new mongoose.model("MoneyRequests", moneyRequestSchema);
+
+module.exports = MoneyRequests;
