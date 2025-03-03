@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   pin: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
 
   role: {
@@ -27,14 +27,14 @@ const userSchema = new mongoose.Schema({
   nid: {
     type: Number,
     required: true,
-    unique: true
+    unique: true,
   },
 
   isDisabled: {
     type: Boolean,
     default: false,
   },
-  
+
   email: {
     type: String,
     required: true,
@@ -43,22 +43,21 @@ const userSchema = new mongoose.Schema({
 
   agentStatus: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    enum: ["pending", "approved", "rejected", "N/A"],
+    default: "pending",
   },
 
   income: {
     type: Number,
-    default: 0
+    default: 0,
   },
 
-  isLoggedIn : {
+  isLoggedIn: {
     type: Boolean,
     required: true,
     default: false,
-  }
-  
-})
+  },
+});
 
 const User = new mongoose.model("User", userSchema);
 

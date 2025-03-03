@@ -99,7 +99,7 @@ app.post("/jwt", async (req, res) => {
     }
   }
 
-  if (user !== "admin") {
+  if (user?.role !== "admin") {
     if (user?.isLoggedIn) {
       return res
         .status(500)
@@ -204,6 +204,7 @@ app.post("/users", async (req, res) => {
 
     res.send({ success: true, user: result });
   } catch (err) {
+    console.log(err);
     res.status(500).send({ error: err.message });
   }
 });
